@@ -1,0 +1,10 @@
+tensorflow
+numpy
+mediapipe
+fastapi
+uvicorn
+opencv-python
+psycopg2-binary
+python-dotenv
+typing-extensions
+tqdm
