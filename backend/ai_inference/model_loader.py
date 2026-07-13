@@ -50,19 +50,3 @@ def get_model():
         )
 
     return _model
-
-
-def print_model_info():
-    model = get_model()
-
-    print("\n========== MODEL INFORMATION ==========")
-    print(f"TensorFlow Version : {tf.__version__}")
-    print(f"Input Shape        : {model.input_shape}")
-    print(f"Output Shape       : {model.output_shape}")
-
-    if hasattr(model.output_shape, "__len__"):
-        print(f"Output Classes     : {model.output_shape[-1]}")
-
-    print("=======================================\n")
-
-    model.summary()

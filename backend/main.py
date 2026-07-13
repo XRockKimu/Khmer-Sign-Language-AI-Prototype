@@ -1,44 +1,33 @@
-import numpy as np
+"""
+FastAPI application entry point.
 
-from ai_inference.model_loader import load_model
-from ai_inference.label_loader import load_labels
-from ai_inference.model_info import print_model_info
+Loads the trained model and label map once at startup via a lifespan
+context manager -- fail-fast: if the .h5 file or label JSON is
+missing, the app will not start -- then mounts the /predict and
+/health/model routers.
 
-def dummy_prediction(model, labels):
+Run with (from within backend/):
 
-    print()
-    print("=" * 50)
-    print("Dummy Prediction Test")
-    print("=" * 50)
+    uvicorn main:app --reload
+"""
 
-    dummy = np.zeros(
-        (1, 30, 252),
-        dtype=np.float32
-    )
+from contextlib import asynccontextmanager
 
-    prediction = model.predict(dummy, verbose=0)
+from fastapi import FastAPI
 
-    predicted_index = prediction.argmax()
-
-    confidence = prediction.max()
-
-    label_names = list(labels.keys())
-
-    print(f"Predicted Index : {predicted_index}")
-    print(f"Predicted Label : {label_names[predicted_index]}")
-    print(f"Confidence      : {confidence:.4f}")
+import routes.health as health_route
+import routes.predict as predict_route
+from ai_inference import label_loader, model_loader
 
 
-def main():
-
-    model = load_model()
-
-    labels = load_labels()
-
-    print_model_info(model)
-
-    dummy_prediction(model, labels)
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    model_loader.load_model()
+    label_loader.load_labels()
+    yield
 
 
-if __name__ == "__main__":
-    main()
+app = FastAPI(lifespan=lifespan)
+
+app.include_router(predict_route.router)
+app.include_router(health_route.router)
