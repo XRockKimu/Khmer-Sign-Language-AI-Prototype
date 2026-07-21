@@ -10,8 +10,16 @@ This module owns only the HTTP boundary: request parsing, delegating
 to InferenceService, and translating exceptions into HTTP responses.
 No feature formatting, label lookup, or model prediction logic lives
 here -- that is ai_inference's responsibility, not routes/.
+
+After a successful prediction, this route also asks
+services.prediction_logging_service to log it to PostgreSQL. That call
+is best-effort and cannot affect the response: prediction_logging_service
+never raises, and the try/except below is a second, defensive layer in
+case of a bug in the logging code itself -- either way, database logging
+failures never turn a successful prediction into an error response.
 """
 
+import logging
 from typing import List
 
 import numpy as np
@@ -20,6 +28,9 @@ from pydantic import BaseModel
 
 from ai_inference import model_loader, label_loader
 from ai_inference.inference_service import InferenceService
+from services import prediction_logging_service
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -73,5 +84,19 @@ def predict(request: PredictRequest) -> dict:
         raise HTTPException(
             status_code=500, detail="Internal inference error."
         )
+
+    try:
+        prediction_logging_service.log_prediction(
+            gesture_class_index=result["predicted_class_index"],
+            confidence=result["confidence"],
+            top_k=result["top_k"],
+            inference_ms=result["inference_ms"],
+        )
+    except Exception as exc:  # pragma: no cover - defense in depth only;
+        # log_prediction already catches its own errors, so reaching this
+        # branch means a bug in the logging service itself, not a normal
+        # database failure. Either way, the prediction response below must
+        # still be returned unaffected.
+        logger.error("Unexpected error while logging prediction: %s", exc)
 
     return result

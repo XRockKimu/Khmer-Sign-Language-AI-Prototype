@@ -17,6 +17,7 @@ from fastapi.testclient import TestClient
 import ai_inference.model_loader as model_loader
 import ai_inference.label_loader as label_loader
 import routes.predict as predict_route
+import services.prediction_logging_service as prediction_logging_service
 
 
 class _MockModel:
@@ -36,6 +37,20 @@ def _wire_mock_dependencies():
     model_loader._model = None
     label_loader._labels = None
     predict_route._inference_service = None
+
+
+@pytest.fixture(autouse=True)
+def _stub_prediction_logging(monkeypatch):
+    """
+    Ensures no test in this file ever touches a real database, regardless
+    of whatever DATABASE_URL happens to be set in the environment when
+    pytest runs -- a prior run without this fixture wrote a real row into
+    a live database because DATABASE_URL was configured in the shell's
+    environment. Tests that need to assert on logging behavior override
+    this with their own monkeypatch.setattr call on top, which wins since
+    it runs after this fixture within the same test.
+    """
+    monkeypatch.setattr(prediction_logging_service, "log_prediction", lambda **kwargs: None)
 
 
 @pytest.fixture
@@ -115,3 +130,40 @@ def test_predict_not_loaded_returns_503(client):
     response = client.post("/predict", json={"sequence": _valid_sequence()})
 
     assert response.status_code == 503
+
+
+def test_predict_succeeds_even_if_prediction_logging_fails(client, monkeypatch):
+    """
+    Day 20's core safety requirement: a database logging failure must
+    never turn a successful prediction into an error response.
+    """
+
+    def _raise(*args, **kwargs):
+        raise RuntimeError("simulated database outage")
+
+    monkeypatch.setattr(prediction_logging_service, "log_prediction", _raise)
+
+    response = client.post("/predict", json={"sequence": _valid_sequence()})
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["predicted_class_index"] == 3
+    assert body["predicted_label"] == "label_3"
+
+
+def test_predict_calls_prediction_logging_with_result_fields(client, monkeypatch):
+    logged = {}
+
+    def _capture(**kwargs):
+        logged.update(kwargs)
+
+    monkeypatch.setattr(prediction_logging_service, "log_prediction", _capture)
+
+    response = client.post("/predict", json={"sequence": _valid_sequence()})
+
+    assert response.status_code == 200
+    body = response.json()
+    assert logged["gesture_class_index"] == body["predicted_class_index"]
+    assert logged["confidence"] == body["confidence"]
+    assert logged["top_k"] == body["top_k"]
+    assert logged["inference_ms"] == body["inference_ms"]
