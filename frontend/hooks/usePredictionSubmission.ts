@@ -2,37 +2,24 @@
 
 import { useEffect } from "react";
 import { predictSequence, PredictionApiError, type PredictionTopKEntry } from "@/lib/predictionApi";
-import { TOTAL_CAPTURE_FRAMES, type PredictionFlowState } from "@/hooks/usePredictionFlow";
-
-const SEQUENCE_FEATURES = 126;
-
-/**
- * Placeholder for the real (30, 126) keypoint sequence MediaPipe will
- * produce. The shape must match the backend's contract; values are
- * arbitrary since no hand is actually being tracked yet. Once MediaPipe
- * lands, this function is replaced by the real accumulated frame buffer --
- * nothing else in this hook changes.
- */
-function createMockSequence(): number[][] {
-  return Array.from({ length: TOTAL_CAPTURE_FRAMES }, () =>
-    Array.from({ length: SEQUENCE_FEATURES }, () => Math.random() * 0.01),
-  );
-}
+import type { PredictionFlowState } from "@/hooks/usePredictionFlow";
 
 interface UsePredictionSubmissionArgs {
   state: PredictionFlowState;
+  getSequence: () => number[][];
   onSuccess: (label: string, confidence: number, topK: PredictionTopKEntry[]) => void;
   onError: (message: string) => void;
 }
 
 /**
  * Fires the real backend prediction request as soon as the flow enters
- * "predicting", and reports the outcome back through the flow's own
- * dispatchers. This is the permanent Day 18 integration -- unlike
- * DevFlowControls, it is not deleted when MediaPipe is wired up.
+ * "predicting", submitting whatever sequence getSequence() returns at that
+ * moment (the real (30, 126) buffer accumulated by useGestureCapture), and
+ * reports the outcome back through the flow's own dispatchers.
  */
 export function usePredictionSubmission({
   state,
+  getSequence,
   onSuccess,
   onError,
 }: UsePredictionSubmissionArgs) {
@@ -42,7 +29,7 @@ export function usePredictionSubmission({
     const controller = new AbortController();
     let ignore = false;
 
-    predictSequence(createMockSequence(), { signal: controller.signal })
+    predictSequence(getSequence(), { signal: controller.signal })
       .then((result) => {
         if (ignore) return;
         onSuccess(result.predictedLabel, result.confidence, result.topK);
@@ -60,5 +47,5 @@ export function usePredictionSubmission({
       ignore = true;
       controller.abort();
     };
-  }, [state.status, onSuccess, onError]);
+  }, [state.status, getSequence, onSuccess, onError]);
 }

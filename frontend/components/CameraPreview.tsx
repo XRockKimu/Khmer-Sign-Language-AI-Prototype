@@ -1,10 +1,28 @@
 "use client";
 
-import { useCameraStream } from "@/hooks/useCameraStream";
+import type { CameraStatus } from "@/hooks/useCameraStream";
 
-export function CameraPreview() {
-  const { videoRef, status, errorMessage, requestCamera } = useCameraStream();
+interface CameraPreviewProps {
+  videoRef: React.RefObject<HTMLVideoElement | null>;
+  status: CameraStatus;
+  errorMessage: string | null;
+  requestCamera: () => void;
+}
 
+/**
+ * Presentational only -- the camera stream itself (useCameraStream) is
+ * owned by the page, not this component, since the same videoRef also
+ * needs to be read by useGestureCapture to grab frames for real keypoint
+ * extraction. Two independent useCameraStream() calls would each request
+ * their own separate MediaStream (and a duplicate permission prompt), so
+ * the hook is lifted up and shared via props instead.
+ */
+export function CameraPreview({
+  videoRef,
+  status,
+  errorMessage,
+  requestCamera,
+}: CameraPreviewProps) {
   const showVideo = status === "granted";
 
   return (

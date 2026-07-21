@@ -3,10 +3,16 @@
 import { CameraPreview } from "@/components/CameraPreview";
 import { PredictionStatus } from "@/components/PredictionStatus";
 import { DevFlowControls } from "@/components/DevFlowControls";
+import { useCameraStream } from "@/hooks/useCameraStream";
+import { useIsCameraReady } from "@/hooks/useIsCameraReady";
 import { usePredictionFlow } from "@/hooks/usePredictionFlow";
+import { useGestureCapture } from "@/hooks/useGestureCapture";
 import { usePredictionSubmission } from "@/hooks/usePredictionSubmission";
 
 export default function KslPredictionDemo() {
+  const camera = useCameraStream();
+  const isCameraReady = useIsCameraReady(camera.videoRef, camera.status);
+
   const {
     state,
     reportHandDetected,
@@ -18,8 +24,16 @@ export default function KslPredictionDemo() {
     reset,
   } = usePredictionFlow();
 
+  const { getCapturedFrames } = useGestureCapture({
+    videoRef: camera.videoRef,
+    state,
+    reportFrameCaptured,
+    onCaptureError: reportPredictionError,
+  });
+
   usePredictionSubmission({
     state,
+    getSequence: getCapturedFrames,
     onSuccess: reportPredictionSuccess,
     onError: reportPredictionError,
   });
@@ -34,14 +48,19 @@ export default function KslPredictionDemo() {
           This page will let you sign a gesture in front of your camera and
           see the predicted Khmer label in real time.
         </p>
-        <CameraPreview />
+        <CameraPreview
+          videoRef={camera.videoRef}
+          status={camera.status}
+          errorMessage={camera.errorMessage}
+          requestCamera={camera.requestCamera}
+        />
         <PredictionStatus state={state} />
         <DevFlowControls
           state={state}
+          isCameraReady={isCameraReady}
           reportHandDetected={reportHandDetected}
           reportHandLost={reportHandLost}
           startCapture={startCapture}
-          reportFrameCaptured={reportFrameCaptured}
           reset={reset}
         />
       </main>

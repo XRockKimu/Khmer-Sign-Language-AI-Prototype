@@ -60,7 +60,11 @@ function reducer(
         : state;
 
     case "PREDICTION_ERROR":
-      return state.status === "predicting"
+      // Reachable from "capturing" too: a real-frame-capture failure (e.g.
+      // the keypoint-extraction request failing mid-capture) needs
+      // somewhere valid to land just as much as a prediction failure does,
+      // otherwise the UI would stay stuck showing capture progress forever.
+      return state.status === "predicting" || state.status === "capturing"
         ? { status: "error", message: action.message }
         : state;
 
