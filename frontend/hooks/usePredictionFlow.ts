@@ -5,12 +5,22 @@ import type { PredictionTopKEntry } from "@/lib/predictionApi";
 
 export const TOTAL_CAPTURE_FRAMES = 30;
 
+/**
+ * Minimum top-1 confidence required to present a prediction as a result.
+ * Below this, the flow reports "uncertain" instead -- per the 30-Day Plan's
+ * recommended initial threshold (Day 23). This only gates what the frontend
+ * displays; the backend always returns and logs the raw, unfiltered
+ * prediction and confidence regardless of this value.
+ */
+export const CONFIDENCE_THRESHOLD = 0.6;
+
 export type PredictionFlowState =
   | { status: "idle" }
   | { status: "hand_detected" }
   | { status: "capturing"; framesCaptured: number; totalFrames: number }
   | { status: "predicting" }
   | { status: "result"; label: string; confidence: number; topK: PredictionTopKEntry[] }
+  | { status: "uncertain"; label: string; confidence: number; topK: PredictionTopKEntry[] }
   | { status: "error"; message: string };
 
 type PredictionFlowAction =
@@ -33,7 +43,13 @@ function reducer(
       return state.status === "idle" ? { status: "hand_detected" } : state;
 
     case "HAND_LOST":
-      return state.status === "hand_detected" ? { status: "idle" } : state;
+      // Fired only by useGestureCapture when MediaPipe stops seeing a hand
+      // mid-capture. Returns to "hand_detected" (the watching-for-a-hand
+      // session), not "idle" -- the session stays alive and automatically
+      // resumes capturing once a hand is detected again. The session only
+      // fully ends via RESET (explicit user cancel) or a successful
+      // prediction.
+      return state.status === "capturing" ? { status: "hand_detected" } : state;
 
     case "START_CAPTURE":
       return state.status === "hand_detected"
@@ -49,22 +65,26 @@ function reducer(
       return { ...state, framesCaptured };
     }
 
-    case "PREDICTION_SUCCESS":
-      return state.status === "predicting"
-        ? {
-            status: "result",
-            label: action.label,
-            confidence: action.confidence,
-            topK: action.topK,
-          }
-        : state;
+    case "PREDICTION_SUCCESS": {
+      if (state.status !== "predicting") return state;
+      const status = action.confidence >= CONFIDENCE_THRESHOLD ? "result" : "uncertain";
+      return {
+        status,
+        label: action.label,
+        confidence: action.confidence,
+        topK: action.topK,
+      };
+    }
 
     case "PREDICTION_ERROR":
-      // Reachable from "capturing" too: a real-frame-capture failure (e.g.
-      // the keypoint-extraction request failing mid-capture) needs
-      // somewhere valid to land just as much as a prediction failure does,
-      // otherwise the UI would stay stuck showing capture progress forever.
-      return state.status === "predicting" || state.status === "capturing"
+      // Reachable from "hand_detected" and "capturing" too: a keypoint-
+      // extraction failure can happen while watching for a hand or while
+      // mid-capture, not just during the /predict call itself. Any of
+      // these needs somewhere valid to land, otherwise the UI would stay
+      // stuck (silently watching or mid-progress) forever with no feedback.
+      return state.status === "predicting" ||
+        state.status === "capturing" ||
+        state.status === "hand_detected"
         ? { status: "error", message: action.message }
         : state;
 

@@ -27,8 +27,10 @@ export default function KslPredictionDemo() {
   const { getCapturedFrames } = useGestureCapture({
     videoRef: camera.videoRef,
     state,
+    startCapture,
     reportFrameCaptured,
     onCaptureError: reportPredictionError,
+    onHandLost: reportHandLost,
   });
 
   usePredictionSubmission({
@@ -59,8 +61,6 @@ export default function KslPredictionDemo() {
           state={state}
           isCameraReady={isCameraReady}
           reportHandDetected={reportHandDetected}
-          reportHandLost={reportHandLost}
-          startCapture={startCapture}
           reset={reset}
         />
       </main>

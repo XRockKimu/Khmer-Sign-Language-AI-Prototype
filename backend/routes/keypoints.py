@@ -76,4 +76,10 @@ def extract_keypoints(frame: UploadFile) -> dict:
     # combined = np.concatenate([left_hand, right_hand]).
     position = np.concatenate([result["left_hand"], result["right_hand"]])
 
-    return {"position": position.tolist()}
+    mediapipe_results = result["results"]
+    hand_detected = (
+        mediapipe_results.left_hand_landmarks is not None
+        or mediapipe_results.right_hand_landmarks is not None
+    )
+
+    return {"position": position.tolist(), "hand_detected": hand_detected}

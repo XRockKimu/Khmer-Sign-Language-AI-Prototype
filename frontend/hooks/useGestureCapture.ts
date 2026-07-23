@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef } from "react";
-import { extractFramePosition, KeypointsApiError } from "@/lib/keypointsApi";
+import { extractFramePosition, KeypointsApiError, type FramePosition } from "@/lib/keypointsApi";
 import { TOTAL_CAPTURE_FRAMES, type PredictionFlowState } from "@/hooks/usePredictionFlow";
 
 const HAVE_CURRENT_DATA = 2;
@@ -25,85 +25,128 @@ function captureFrameBlob(video: HTMLVideoElement): Promise<Blob | null> {
 interface UseGestureCaptureArgs {
   videoRef: React.RefObject<HTMLVideoElement | null>;
   state: PredictionFlowState;
+  startCapture: () => void;
   reportFrameCaptured: () => void;
   onCaptureError: (message: string) => void;
+  onHandLost: () => void;
 }
 
 /**
- * Drives real gesture capture: while the flow is "capturing", sequentially
- * grabs a frame from the live camera feed, sends it to the backend's
- * /keypoints/extract endpoint (the real MediaPipe-based extractor), and
- * accumulates the returned 126-feature position vectors. Once 30 real
- * frames have been captured, getCapturedFrames() returns the full
- * (30, 126) sequence for usePredictionSubmission to submit to /predict.
+ * Drives real gesture capture for the whole "watching for a hand -> capture
+ * a 30-frame sequence" session, using the real MediaPipe-based
+ * /keypoints/extract endpoint for both parts:
  *
- * Frames are captured sequentially (await each extraction before grabbing
- * the next frame), not on a fixed timer, since each capture is a real
- * network round trip whose duration can vary.
+ * - While the flow is "hand_detected" (a session is active but no hand has
+ *   been seen yet), it repeatedly grabs a frame and checks the returned
+ *   handDetected flag WITHOUT accumulating a sequence or calling /predict.
+ *   The moment a frame reports a hand, it calls startCapture() itself,
+ *   which flips the flow to "capturing".
+ * - While the flow is "capturing", it accumulates 30 real frames as before.
+ *   If a frame reports no hand, the partial sequence is discarded and
+ *   onHandLost() is called, which returns the flow to "hand_detected" --
+ *   this same effect then naturally restarts the watch loop above, so
+ *   capture resumes automatically once a hand reappears.
  *
- * This replaces DevFlowControls' previous mock frame-capture timer. The
- * hand-detection trigger itself remains a manual dev control -- automatic
- * hand-presence detection is a separate, larger feature not required for
- * deliberate, one-sign-at-a-time manual testing.
+ * Either loop ends the moment the flow leaves "hand_detected"/"capturing"
+ * (successful prediction, error, or an explicit reset), since the effect
+ * simply stops running for any other status.
+ *
+ * Frames are grabbed sequentially (await each extraction before grabbing
+ * the next), not on a fixed timer, since each grab is a real network round
+ * trip whose duration can vary.
  */
 export function useGestureCapture({
   videoRef,
   state,
+  startCapture,
   reportFrameCaptured,
   onCaptureError,
+  onHandLost,
 }: UseGestureCaptureArgs) {
   const framesRef = useRef<number[][]>([]);
 
   useEffect(() => {
-    if (state.status !== "capturing") return;
+    if (state.status !== "hand_detected" && state.status !== "capturing") return;
 
     let cancelled = false;
-    framesRef.current = [];
     const controller = new AbortController();
 
-    async function captureLoop() {
-      for (let i = 0; i < TOTAL_CAPTURE_FRAMES; i++) {
-        if (cancelled) return;
+    async function nextFrame(): Promise<FramePosition | null> {
+      const video = videoRef.current;
+      if (!video || video.readyState < HAVE_CURRENT_DATA) {
+        onCaptureError("Camera feed is not ready. Please try again.");
+        return null;
+      }
 
-        const video = videoRef.current;
-        if (!video || video.readyState < HAVE_CURRENT_DATA) {
-          onCaptureError("Camera feed is not ready. Please try again.");
-          return;
-        }
+      const blob = await captureFrameBlob(video);
+      if (cancelled) return null;
+      if (!blob) {
+        onCaptureError("Could not capture a frame from the camera.");
+        return null;
+      }
 
-        const blob = await captureFrameBlob(video);
-        if (cancelled) return;
-        if (!blob) {
-          onCaptureError("Could not capture a frame from the camera.");
-          return;
-        }
+      return extractFramePosition(blob, { signal: controller.signal });
+    }
 
-        try {
-          const position = await extractFramePosition(blob, {
-            signal: controller.signal,
-          });
-          if (cancelled) return;
-          framesRef.current.push(position);
-          reportFrameCaptured();
-        } catch (err) {
-          if (cancelled) return;
-          const message =
-            err instanceof KeypointsApiError
-              ? err.message
-              : "Something went wrong while extracting hand keypoints.";
-          onCaptureError(message);
-          return;
+    function reportExtractionError(err: unknown) {
+      if (cancelled) return;
+      const message =
+        err instanceof KeypointsApiError
+          ? err.message
+          : "Something went wrong while extracting hand keypoints.";
+      onCaptureError(message);
+    }
+
+    async function waitForHandLoop() {
+      try {
+        while (!cancelled) {
+          const result = await nextFrame();
+          if (cancelled || result === null) return;
+
+          if (result.handDetected) {
+            startCapture();
+            return;
+          }
         }
+      } catch (err) {
+        reportExtractionError(err);
       }
     }
 
-    captureLoop();
+    async function captureLoop() {
+      framesRef.current = [];
+      try {
+        for (let i = 0; i < TOTAL_CAPTURE_FRAMES; i++) {
+          if (cancelled) return;
+
+          const result = await nextFrame();
+          if (cancelled || result === null) return;
+
+          if (!result.handDetected) {
+            framesRef.current = [];
+            onHandLost();
+            return;
+          }
+
+          framesRef.current.push(result.position);
+          reportFrameCaptured();
+        }
+      } catch (err) {
+        reportExtractionError(err);
+      }
+    }
+
+    if (state.status === "capturing") {
+      captureLoop();
+    } else {
+      waitForHandLoop();
+    }
 
     return () => {
       cancelled = true;
       controller.abort();
     };
-  }, [state.status, videoRef, reportFrameCaptured, onCaptureError]);
+  }, [state.status, videoRef, startCapture, reportFrameCaptured, onCaptureError, onHandLost]);
 
   const getCapturedFrames = useCallback(() => framesRef.current, []);
 

@@ -24,7 +24,12 @@ export class KeypointsApiError extends Error {
   }
 }
 
-function parsePosition(data: unknown): number[] {
+export interface FramePosition {
+  position: number[];
+  handDetected: boolean;
+}
+
+function parseFramePosition(data: unknown): FramePosition {
   if (typeof data !== "object" || data === null) {
     throw new KeypointsApiError(
       "invalid_response",
@@ -32,12 +37,13 @@ function parsePosition(data: unknown): number[] {
     );
   }
 
-  const { position } = data as Record<string, unknown>;
+  const { position, hand_detected } = data as Record<string, unknown>;
 
   if (
     !Array.isArray(position) ||
     position.length !== POSITION_FEATURES ||
-    !position.every((v) => typeof v === "number")
+    !position.every((v) => typeof v === "number") ||
+    typeof hand_detected !== "boolean"
   ) {
     throw new KeypointsApiError(
       "invalid_response",
@@ -45,7 +51,7 @@ function parsePosition(data: unknown): number[] {
     );
   }
 
-  return position;
+  return { position, handDetected: hand_detected };
 }
 
 interface ExtractFramePositionOptions {
@@ -55,7 +61,7 @@ interface ExtractFramePositionOptions {
 export async function extractFramePosition(
   frame: Blob,
   options?: ExtractFramePositionOptions,
-): Promise<number[]> {
+): Promise<FramePosition> {
   const timeoutController = new AbortController();
   let timedOut = false;
   const timeoutId = setTimeout(() => {
@@ -123,5 +129,5 @@ export async function extractFramePosition(
     );
   }
 
-  return parsePosition(data);
+  return parseFramePosition(data);
 }

@@ -1,12 +1,13 @@
 import type { PredictionFlowState } from "@/hooks/usePredictionFlow";
 
-type Tone = "neutral" | "info" | "active" | "success" | "error";
+type Tone = "neutral" | "info" | "active" | "success" | "warning" | "error";
 
 const TONE_CLASSES: Record<Tone, string> = {
   neutral: "bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-300",
   info: "bg-blue-100 text-blue-700 dark:bg-blue-950 dark:text-blue-300",
   active: "bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-300",
   success: "bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300",
+  warning: "bg-orange-100 text-orange-700 dark:bg-orange-950 dark:text-orange-300",
   error: "bg-red-100 text-red-700 dark:bg-red-950 dark:text-red-300",
 };
 
@@ -33,9 +34,9 @@ export function PredictionStatus({ state }: { state: PredictionFlowState }) {
     case "hand_detected":
       return (
         <div className="flex flex-col items-center gap-2">
-          <StatusBadge tone="info">Hand detected</StatusBadge>
+          <StatusBadge tone="info">Watching for a hand</StatusBadge>
           <p className="text-sm text-zinc-500 dark:text-zinc-400">
-            Hold steady, capture is about to start&hellip;
+            Show your sign to the camera &mdash; capture starts automatically.
           </p>
         </div>
       );
@@ -101,10 +102,24 @@ export function PredictionStatus({ state }: { state: PredictionFlowState }) {
         </div>
       );
 
+    case "uncertain":
+      return (
+        <div className="flex flex-col items-center gap-2">
+          <StatusBadge tone="warning">Not confident enough</StatusBadge>
+          <p className="max-w-xs text-sm text-zinc-500 dark:text-zinc-400">
+            The model couldn&apos;t recognize that sign clearly. Please try
+            again.
+          </p>
+          <p className="text-xs text-zinc-400 dark:text-zinc-500">
+            Best guess: {state.label} ({Math.round(state.confidence * 100)}%)
+          </p>
+        </div>
+      );
+
     case "error":
       return (
         <div className="flex flex-col items-center gap-2">
-          <StatusBadge tone="error">Prediction failed</StatusBadge>
+          <StatusBadge tone="error">Something went wrong</StatusBadge>
           <p className="max-w-xs text-sm text-zinc-500 dark:text-zinc-400">
             {state.message}
           </p>

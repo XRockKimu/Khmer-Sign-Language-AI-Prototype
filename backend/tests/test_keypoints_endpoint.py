@@ -65,8 +65,9 @@ def test_extract_keypoints_no_hand_returns_zero_vector(client):
     )
 
     assert response.status_code == 200
-    position = response.json()["position"]
-    assert position == [0.0] * 126
+    body = response.json()
+    assert body["position"] == [0.0] * 126
+    assert body["hand_detected"] is False
 
 
 def test_extract_keypoints_invalid_image_returns_422(client):
