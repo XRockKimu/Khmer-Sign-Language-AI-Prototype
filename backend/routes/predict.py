@@ -11,12 +11,19 @@ to InferenceService, and translating exceptions into HTTP responses.
 No feature formatting, label lookup, or model prediction logic lives
 here -- that is ai_inference's responsibility, not routes/.
 
-After a successful prediction, this route also asks
-services.prediction_logging_service to log it to PostgreSQL. That call
-is best-effort and cannot affect the response: prediction_logging_service
+After every prediction attempt -- success or failure -- this route also
+asks services.prediction_logging_service to log it to PostgreSQL. That
+call is best-effort and cannot affect the response: prediction_logging_service
 never raises, and the try/except below is a second, defensive layer in
 case of a bug in the logging code itself -- either way, database logging
-failures never turn a successful prediction into an error response.
+failures never turn a successful prediction into an error response, and
+never delay the error response for a genuinely bad request either.
+
+Milestone 12: a 422 (bad input) or 500 (inference failure) is now also
+logged, as status="error", so the unified prediction log reflects every
+/predict call, not just the successful ones. A 503 (model not loaded) is
+not logged -- it means no prediction was ever attempted, so there is
+nothing to log.
 """
 
 import logging
@@ -58,6 +65,19 @@ class PredictRequest(BaseModel):
     sequence: List[List[float]]
 
 
+def _log_error_safely() -> None:
+    """
+    Defense-in-depth wrapper around log_prediction_error(), mirroring the
+    try/except already around log_prediction() below: that function never
+    raises either, so reaching this except branch means a bug in the
+    logging service itself, not a normal database failure.
+    """
+    try:
+        prediction_logging_service.log_prediction_error()
+    except Exception as exc:  # pragma: no cover - defense in depth only
+        logger.error("Unexpected error while logging prediction failure: %s", exc)
+
+
 @router.post("/predict")
 def predict(request: PredictRequest) -> dict:
     try:
@@ -77,10 +97,12 @@ def predict(request: PredictRequest) -> dict:
         # feature_formatter and propagated unmodified through
         # InferenceService -- a client-side data problem, not a
         # server bug.
+        _log_error_safely()
         raise HTTPException(status_code=422, detail=str(exc))
     except Exception:
         # Genuinely unexpected failure (e.g. a TensorFlow-level
         # error). Do not leak internals to the client.
+        _log_error_safely()
         raise HTTPException(
             status_code=500, detail="Internal inference error."
         )

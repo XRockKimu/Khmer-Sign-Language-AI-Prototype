@@ -47,7 +47,7 @@ def test_log_prediction_happy_path_calls_repository_and_commits(monkeypatch):
     monkeypatch.setattr(
         repository,
         "fetch_active_model_version",
-        lambda c: {"id": 1, "version_label": "v1", "num_classes": 25},
+        lambda c, **kwargs: {"id": 1, "version_label": "v1", "num_classes": 25},
     )
 
     def _create_session(c, client_identifier=None):
@@ -84,7 +84,7 @@ def test_log_prediction_caches_active_model_version(monkeypatch):
         prediction_logging_service, "get_connection", lambda: _fake_get_connection(conn)
     )
 
-    def _fetch(c):
+    def _fetch(c, **kwargs):
         fetch_calls.append(c)
         return {"id": 1, "version_label": "v1", "num_classes": 25}
 
@@ -139,3 +139,45 @@ def test_log_prediction_swallows_repository_failure(monkeypatch):
     )
 
     assert conn.committed is False
+
+
+def test_log_prediction_error_calls_repository_with_error_status_and_null_fields(
+    monkeypatch,
+):
+    conn = _FakeConnection()
+    calls = {}
+
+    monkeypatch.setattr(
+        prediction_logging_service, "get_connection", lambda: _fake_get_connection(conn)
+    )
+    monkeypatch.setattr(
+        repository,
+        "fetch_active_model_version",
+        lambda c, **kwargs: {"id": 1, "version_label": "v1", "num_classes": 25},
+    )
+    monkeypatch.setattr(
+        repository, "create_session", lambda c, client_identifier=None: "session-err"
+    )
+
+    def _insert_event(c, **kwargs):
+        calls["event_kwargs"] = kwargs
+        return 100
+
+    monkeypatch.setattr(repository, "insert_prediction_event", _insert_event)
+
+    prediction_logging_service.log_prediction_error()
+
+    assert conn.committed is True
+    assert calls["event_kwargs"]["session_id"] == "session-err"
+    assert calls["event_kwargs"]["model_version_id"] == 1
+    assert calls["event_kwargs"]["status"] == "error"
+
+
+def test_log_prediction_error_swallows_connection_failure(monkeypatch):
+    def _raise_connection_error():
+        raise RuntimeError("DATABASE_URL is not set")
+
+    monkeypatch.setattr(prediction_logging_service, "get_connection", _raise_connection_error)
+
+    # Must not raise.
+    prediction_logging_service.log_prediction_error()

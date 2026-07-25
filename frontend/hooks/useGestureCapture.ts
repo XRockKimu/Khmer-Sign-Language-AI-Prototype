@@ -1,7 +1,11 @@
 "use client";
 
 import { useCallback, useEffect, useRef } from "react";
-import { extractFramePosition, KeypointsApiError, type FramePosition } from "@/lib/keypointsApi";
+import {
+  extractFramePosition as defaultExtractFramePosition,
+  KeypointsApiError,
+  type FramePosition,
+} from "@/lib/keypointsApi";
 import { TOTAL_CAPTURE_FRAMES, type PredictionFlowState } from "@/hooks/usePredictionFlow";
 
 const HAVE_CURRENT_DATA = 2;
@@ -29,6 +33,17 @@ interface UseGestureCaptureArgs {
   reportFrameCaptured: () => void;
   onCaptureError: (message: string) => void;
   onHandLost: () => void;
+  /**
+   * Defaults to the existing backend's extractFramePosition (126-length
+   * hands-only vectors). Pages targeting backend_keras3 pass
+   * lib/lstmKeypointsApi's version instead (258-length pose+hands
+   * vectors) -- this hook's own capture-loop logic is identical either
+   * way, only the network call differs.
+   */
+  extractFramePosition?: (
+    frame: Blob,
+    options?: { signal?: AbortSignal },
+  ) => Promise<FramePosition>;
 }
 
 /**
@@ -62,6 +77,7 @@ export function useGestureCapture({
   reportFrameCaptured,
   onCaptureError,
   onHandLost,
+  extractFramePosition = defaultExtractFramePosition,
 }: UseGestureCaptureArgs) {
   const framesRef = useRef<number[][]>([]);
 
@@ -146,7 +162,15 @@ export function useGestureCapture({
       cancelled = true;
       controller.abort();
     };
-  }, [state.status, videoRef, startCapture, reportFrameCaptured, onCaptureError, onHandLost]);
+  }, [
+    state.status,
+    videoRef,
+    startCapture,
+    reportFrameCaptured,
+    onCaptureError,
+    onHandLost,
+    extractFramePosition,
+  ]);
 
   const getCapturedFrames = useCallback(() => framesRef.current, []);
 

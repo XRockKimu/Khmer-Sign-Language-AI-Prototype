@@ -1,7 +1,12 @@
 "use client";
 
 import { useEffect } from "react";
-import { predictSequence, PredictionApiError, type PredictionTopKEntry } from "@/lib/predictionApi";
+import {
+  predictSequence as defaultPredictSequence,
+  PredictionApiError,
+  type PredictionResult,
+  type PredictionTopKEntry,
+} from "@/lib/predictionApi";
 import type { PredictionFlowState } from "@/hooks/usePredictionFlow";
 
 interface UsePredictionSubmissionArgs {
@@ -9,19 +14,31 @@ interface UsePredictionSubmissionArgs {
   getSequence: () => number[][];
   onSuccess: (label: string, confidence: number, topK: PredictionTopKEntry[]) => void;
   onError: (message: string) => void;
+  /**
+   * Defaults to the existing backend's predictSequence. Pages targeting
+   * backend_keras3 pass lib/lstmPredictionApi's version instead -- the
+   * response shape is identical either way (see lstmPredictionApi.ts),
+   * only the endpoint differs.
+   */
+  predictSequence?: (
+    sequence: number[][],
+    options?: { signal?: AbortSignal },
+  ) => Promise<PredictionResult>;
 }
 
 /**
  * Fires the real backend prediction request as soon as the flow enters
  * "predicting", submitting whatever sequence getSequence() returns at that
- * moment (the real (30, 126) buffer accumulated by useGestureCapture), and
- * reports the outcome back through the flow's own dispatchers.
+ * moment (the real buffer accumulated by useGestureCapture -- (30, 126) for
+ * the existing backend, (30, 258) for backend_keras3), and reports the
+ * outcome back through the flow's own dispatchers.
  */
 export function usePredictionSubmission({
   state,
   getSequence,
   onSuccess,
   onError,
+  predictSequence = defaultPredictSequence,
 }: UsePredictionSubmissionArgs) {
   useEffect(() => {
     if (state.status !== "predicting") return;
@@ -47,5 +64,5 @@ export function usePredictionSubmission({
       ignore = true;
       controller.abort();
     };
-  }, [state.status, getSequence, onSuccess, onError]);
+  }, [state.status, getSequence, onSuccess, onError, predictSequence]);
 }

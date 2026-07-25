@@ -2,12 +2,19 @@
 Raw SQL data-access layer for prediction logging.
 
 Owns every query against gesture_classes, model_versions,
-prediction_sessions, and prediction_events -- the tables created in Day 19
-(database/migrations/001_initial_schema.sql) and extended in Milestone 12
-(database/migrations/004_multi_model_unified_logging.sql). No SQL for
-these tables should be written anywhere outside this module; callers (see
-services.prediction_logging_service) pass an open connection in and get
-plain Python values back.
+prediction_sessions, and prediction_events -- the same tables
+backend/db/prediction_repository.py owns, shared across both backends as
+of Milestone 12 (see database/migrations/004_multi_model_unified_logging.sql).
+No SQL for these tables should be written anywhere outside this module;
+callers (see services.prediction_logging_service) pass an open connection
+in and get plain Python values back.
+
+This is a deliberate copy of backend/db/prediction_repository.py, not an
+import across backends -- the two are independent deployable services
+with separate virtualenvs (see db/connection.py's docstring for the same
+reasoning). The functions here are identical: nothing about logging a
+prediction differs between an "original" prediction and an "lstm"/"gru"/
+"bgru"/"blstm" one, only which (backend, model_id) is passed in.
 
 None of these functions commit or roll back -- that is the caller's
 decision, so multiple calls sharing one connection can be composed into a
@@ -28,17 +35,16 @@ def fetch_active_model_version(
     model_versions row currently marked is_active for this (backend,
     model_id) pair.
 
-    Milestone 12: filters by (backend, model_id) instead of blindly
-    grabbing "the" active row -- backend_keras3 now serves four
-    concurrently-active models alongside this backend's own "original"
-    row, so `WHERE is_active` alone can no longer identify a single row
-    (see database/migrations/004_multi_model_unified_logging.sql).
+    backend_keras3 serves four models (lstm/gru/bgru/blstm), each with its
+    own active model_versions row -- callers must always pass the specific
+    model_id being predicted, not assume a single system-wide active row.
 
     Raises RuntimeError if no model version is marked active for this
-    pair -- this indicates the relevant seed migration was never applied,
-    or the version has since been deactivated. Either way it is a
-    configuration problem the caller should surface as a logging
-    failure, not silently guess a model version for.
+    pair -- this indicates
+    database/migrations/005_seed_keras3_model_versions.sql was never
+    applied, or the version has since been deactivated. Either way it is a
+    configuration problem the caller should surface as a logging failure,
+    not silently guess a model version for.
     """
     with conn.cursor() as cur:
         cur.execute(
@@ -108,10 +114,10 @@ def insert_prediction_event(
     verbatim -- callers should pass the /predict response's own top_k list
     ([{"label": str, "confidence": float}, ...]) unmodified.
 
-    Milestone 12: gesture_class_index/confidence/top_k/inference_ms are
-    optional and status defaults to "success", so a failed prediction
-    attempt can be logged as status="error" with all four left NULL --
-    matching the CHECK constraint added in
+    gesture_class_index/confidence/top_k/inference_ms are optional and
+    status defaults to "success", so a failed prediction attempt can be
+    logged as status="error" with all four left NULL -- matching the
+    CHECK constraint added in
     database/migrations/004_multi_model_unified_logging.sql, which
     requires exactly that pairing.
     """

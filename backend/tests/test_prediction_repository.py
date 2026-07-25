@@ -43,7 +43,9 @@ class _RecordingConnection:
 def test_fetch_active_model_version_returns_mapped_dict():
     conn = _RecordingConnection(fetchone_result=(7, "best_model_25class_fix", 25))
 
-    result = repository.fetch_active_model_version(conn)
+    result = repository.fetch_active_model_version(
+        conn, backend="backend", model_id="original"
+    )
 
     assert result == {
         "id": 7,
@@ -53,14 +55,16 @@ def test_fetch_active_model_version_returns_mapped_dict():
     sql, params = conn._cursor.executed[0]
     assert "model_versions" in sql
     assert "is_active" in sql
-    assert params is None
+    assert params == ("backend", "original")
 
 
 def test_fetch_active_model_version_raises_when_none_active():
     conn = _RecordingConnection(fetchone_result=None)
 
     with pytest.raises(RuntimeError):
-        repository.fetch_active_model_version(conn)
+        repository.fetch_active_model_version(
+            conn, backend="backend", model_id="original"
+        )
 
 
 def test_create_session_returns_id_as_string():
@@ -103,6 +107,7 @@ def test_insert_prediction_event_passes_correct_params_and_serializes_top_k():
     (
         session_id_param,
         model_version_id_param,
+        status_param,
         gesture_class_index_param,
         confidence_param,
         top_k_param,
@@ -110,7 +115,36 @@ def test_insert_prediction_event_passes_correct_params_and_serializes_top_k():
     ) = params
     assert session_id_param == "11111111-1111-1111-1111-111111111111"
     assert model_version_id_param == 1
+    assert status_param == "success"
     assert gesture_class_index_param == 3
     assert confidence_param == 0.9
     assert isinstance(top_k_param, Json)
     assert inference_ms_param == 12.5
+
+
+def test_insert_prediction_event_error_status_leaves_prediction_fields_null():
+    conn = _RecordingConnection(fetchone_result=(43,))
+
+    event_id = repository.insert_prediction_event(
+        conn,
+        session_id="11111111-1111-1111-1111-111111111111",
+        model_version_id=1,
+        status="error",
+    )
+
+    assert event_id == 43
+    _, params = conn._cursor.executed[0]
+    (
+        _session_id,
+        _model_version_id,
+        status_param,
+        gesture_class_index_param,
+        confidence_param,
+        top_k_param,
+        inference_ms_param,
+    ) = params
+    assert status_param == "error"
+    assert gesture_class_index_param is None
+    assert confidence_param is None
+    assert top_k_param is None
+    assert inference_ms_param is None

@@ -46,7 +46,7 @@ function isTopKEntry(value: unknown): value is PredictionTopKEntry {
   return typeof record.label === "string" && typeof record.confidence === "number";
 }
 
-function parsePredictionResult(data: unknown): PredictionResult {
+export function parsePredictionResult(data: unknown): PredictionResult {
   if (typeof data !== "object" || data === null) {
     throw new PredictionApiError(
       "invalid_response",

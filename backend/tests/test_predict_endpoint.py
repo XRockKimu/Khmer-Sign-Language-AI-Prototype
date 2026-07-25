@@ -49,8 +49,15 @@ def _stub_prediction_logging(monkeypatch):
     environment. Tests that need to assert on logging behavior override
     this with their own monkeypatch.setattr call on top, which wins since
     it runs after this fixture within the same test.
+
+    Milestone 12: also stubs log_prediction_error, the equivalent call
+    routes/predict.py now makes on the 422/500 paths -- without this, the
+    same "wrote a real row" risk applies to error responses too.
     """
     monkeypatch.setattr(prediction_logging_service, "log_prediction", lambda **kwargs: None)
+    monkeypatch.setattr(
+        prediction_logging_service, "log_prediction_error", lambda **kwargs: None
+    )
 
 
 @pytest.fixture
@@ -167,3 +174,59 @@ def test_predict_calls_prediction_logging_with_result_fields(client, monkeypatch
     assert logged["confidence"] == body["confidence"]
     assert logged["top_k"] == body["top_k"]
     assert logged["inference_ms"] == body["inference_ms"]
+
+
+def test_predict_wrong_row_count_logs_prediction_error(client, monkeypatch):
+    """
+    Milestone 12: a 422 (bad input) must still be logged as a failed
+    attempt, not silently dropped from the unified prediction log.
+    """
+    calls = []
+    monkeypatch.setattr(
+        prediction_logging_service, "log_prediction_error", lambda **kw: calls.append(kw)
+    )
+
+    bad_sequence = np.zeros((29, 126)).tolist()
+    response = client.post("/predict", json={"sequence": bad_sequence})
+
+    assert response.status_code == 422
+    assert len(calls) == 1
+
+
+def test_predict_model_exception_logs_prediction_error(client, monkeypatch):
+    """Milestone 12: a 500 (inference failure) must also be logged."""
+    calls = []
+    monkeypatch.setattr(
+        prediction_logging_service, "log_prediction_error", lambda **kw: calls.append(kw)
+    )
+
+    class _FailingModel:
+        def predict(self, batch, verbose=0):
+            raise RuntimeError("simulated TensorFlow failure")
+
+    model_loader._model = _FailingModel()
+    predict_route._inference_service = None
+
+    response = client.post("/predict", json={"sequence": _valid_sequence()})
+
+    assert response.status_code == 500
+    assert len(calls) == 1
+
+
+def test_predict_succeeds_even_if_prediction_error_logging_fails(client, monkeypatch):
+    """
+    The error-logging counterpart of
+    test_predict_succeeds_even_if_prediction_logging_fails: a failure in
+    log_prediction_error() must not change the 422 response it was
+    attached to.
+    """
+
+    def _raise(*args, **kwargs):
+        raise RuntimeError("simulated database outage")
+
+    monkeypatch.setattr(prediction_logging_service, "log_prediction_error", _raise)
+
+    bad_sequence = np.zeros((29, 126)).tolist()
+    response = client.post("/predict", json={"sequence": bad_sequence})
+
+    assert response.status_code == 422
