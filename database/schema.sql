@@ -3,17 +3,32 @@
 -- Consolidated structural snapshot of the current database schema, kept in
 -- sync with database/migrations/*.sql. This file reflects structure only
 -- (tables, constraints, indexes, views) -- it does not include seed data,
--- which lives in the numbered seed migrations and should be applied
--- separately after this file. Use migrations/ for the ordered, authoritative
--- change history; use this file to stand up a fresh database in one step or
--- as a quick reference for the current shape of the schema.
+-- which lives in database/seed.sql and should be applied separately after
+-- this file.
 --
--- To rebuild a database from scratch:
---   psql "$DATABASE_URL" -f database/schema.sql
---   psql "$DATABASE_URL" -f database/migrations/002_seed_gesture_classes.sql
---   psql "$DATABASE_URL" -f database/migrations/003_seed_model_version.sql
---   psql "$DATABASE_URL" -f database/migrations/005_seed_keras3_model_versions.sql
---   psql "$DATABASE_URL" -f database/migrations/006_seed_keras3_gesture_classes.sql
+-- Two installation paths exist, and they are not meant to be mixed:
+--
+--   Fresh install (new, empty database) -- this is the supported path for
+--   standing up a new environment, and the only one this header documents
+--   the steps for:
+--     psql "$DATABASE_URL" -f database/schema.sql
+--     psql "$DATABASE_URL" -f database/seed.sql
+--
+--   Historical upgrade (an existing pre-Milestone-12 database) -- replay
+--   database/migrations/ in order instead of using this file:
+--     001_initial_schema.sql -> 002_seed_gesture_classes.sql ->
+--     003_seed_model_version.sql -> 004_multi_model_unified_logging.sql ->
+--     005_seed_keras3_model_versions.sql ->
+--     006_seed_keras3_gesture_classes.sql
+--     migrations/ is kept purely as the ordered historical record of how
+--     the schema reached its current shape; 002 and 003 in particular only
+--     make sense in that sequence -- they insert against the
+--     pre-Milestone-12 shape (a bare class_index primary key on
+--     gesture_classes, and a model_versions row with no backend/model_id),
+--     which stops existing the moment 004 runs. Do not run any
+--     migrations/ file against a database created from this file --
+--     seed.sql is their fresh-install replacement, not a supplement to
+--     them.
 
 CREATE EXTENSION IF NOT EXISTS pgcrypto;
 
@@ -83,8 +98,8 @@ COMMENT ON COLUMN gesture_classes.class_index IS
 COMMENT ON COLUMN gesture_classes.is_active IS
     'False once a class is retired from future training/inference, without deleting historical prediction_events rows referencing it.';
 
-CREATE UNIQUE INDEX gesture_classes_model_version_label_key
-    ON gesture_classes (model_version_id, label);
+ALTER TABLE gesture_classes ADD CONSTRAINT gesture_classes_model_version_label_key
+    UNIQUE (model_version_id, label);
 
 -- ---------------------------------------------------------------------
 -- prediction_sessions
