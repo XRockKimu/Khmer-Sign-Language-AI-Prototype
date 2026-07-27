@@ -25,16 +25,25 @@ export function DevFlowControls({
   reset,
 }: DevFlowControlsProps) {
   return (
-    <div className="flex flex-col items-center gap-2 rounded-lg border border-dashed border-amber-500/40 bg-amber-50 p-4 text-xs dark:bg-amber-950/20">
-      <p className="font-medium text-amber-700 dark:text-amber-400">
-        Developer controls
-      </p>
-      <div className="flex flex-wrap justify-center gap-2">
+    <details
+      open
+      className="group w-full max-w-xs rounded-xl border border-black/[.06] bg-black/[.02] text-xs dark:border-white/[.08] dark:bg-white/[.03]"
+    >
+      <summary className="flex cursor-pointer list-none items-center justify-between gap-2 px-4 py-3 font-medium text-zinc-500 transition-colors hover:text-zinc-700 [&::-webkit-details-marker]:hidden dark:text-zinc-400 dark:hover:text-zinc-200">
+        <span className="flex items-center gap-2">
+          <span className="h-1.5 w-1.5 rounded-full bg-zinc-400 dark:bg-zinc-600" />
+          Developer controls
+        </span>
+        <span className="text-zinc-400 transition-transform group-open:rotate-180 dark:text-zinc-600">
+          ▾
+        </span>
+      </summary>
+      <div className="flex flex-wrap justify-center gap-2 px-4 pb-4">
         <button
           type="button"
           onClick={reportHandDetected}
           disabled={state.status !== "idle" || !isCameraReady}
-          className="rounded-full border border-black/10 px-3 py-1.5 font-medium disabled:opacity-40 dark:border-white/20"
+          className="rounded-full bg-black px-3.5 py-1.5 font-medium text-white transition-colors hover:bg-zinc-800 disabled:opacity-30 dark:bg-white dark:text-black dark:hover:bg-zinc-200"
         >
           Start capture
         </button>
@@ -42,11 +51,11 @@ export function DevFlowControls({
           type="button"
           onClick={reset}
           disabled={state.status === "idle"}
-          className="rounded-full border border-black/10 px-3 py-1.5 font-medium disabled:opacity-40 dark:border-white/20"
+          className="rounded-full border border-black/10 px-3.5 py-1.5 font-medium text-zinc-700 transition-colors hover:bg-black/5 disabled:opacity-30 dark:border-white/20 dark:text-zinc-300 dark:hover:bg-white/10"
         >
           Reset
         </button>
       </div>
-    </div>
+    </details>
   );
 }

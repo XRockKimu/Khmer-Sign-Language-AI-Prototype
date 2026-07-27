@@ -26,32 +26,37 @@ export function CameraPreview({
   const showVideo = status === "granted";
 
   return (
-    <div className="relative aspect-video w-full overflow-hidden rounded-xl border border-black/[.08] bg-black dark:border-white/[.145]">
-      <video
-        ref={videoRef}
-        autoPlay
-        playsInline
-        muted
-        className={`h-full w-full object-cover ${showVideo ? "block" : "hidden"}`}
-      />
-      {!showVideo && (
-        <div className="flex h-full flex-col items-center justify-center gap-3 p-6 text-center text-sm">
-          {status === "requesting" ? (
-            <p className="text-zinc-300">Requesting camera access…</p>
-          ) : (
-            <>
-              <p className="text-zinc-200">{errorMessage}</p>
-              <button
-                type="button"
-                onClick={requestCamera}
-                className="rounded-full border border-white/20 px-4 py-2 text-xs font-medium text-white transition-colors hover:bg-white/10"
-              >
-                Try again
-              </button>
-            </>
-          )}
-        </div>
-      )}
+    <div className="w-full rounded-2xl border border-black/[.06] bg-white/70 p-3 shadow-sm backdrop-blur-md dark:border-white/[.08] dark:bg-zinc-900/50">
+      <div className="relative aspect-video w-full overflow-hidden rounded-xl bg-black">
+        <video
+          ref={videoRef}
+          autoPlay
+          playsInline
+          muted
+          className={`h-full w-full object-cover ${showVideo ? "block" : "hidden"}`}
+        />
+        {!showVideo && (
+          <div className="flex h-full flex-col items-center justify-center gap-3 p-6 text-center text-sm">
+            {status === "requesting" ? (
+              <>
+                <span className="h-5 w-5 animate-spin rounded-full border-2 border-white/20 border-t-white/70" />
+                <p className="text-zinc-300">Requesting camera access…</p>
+              </>
+            ) : (
+              <>
+                <p className="text-zinc-200">{errorMessage}</p>
+                <button
+                  type="button"
+                  onClick={requestCamera}
+                  className="rounded-full border border-white/20 bg-white/10 px-4 py-2 text-xs font-medium text-white transition-colors hover:bg-white/20"
+                >
+                  Try again
+                </button>
+              </>
+            )}
+          </div>
+        )}
+      </div>
     </div>
   );
 }

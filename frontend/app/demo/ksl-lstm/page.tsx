@@ -55,16 +55,21 @@ export default function KslLstmDemo() {
   });
 
   return (
-    <div className="flex flex-col flex-1 items-center bg-zinc-50 font-sans dark:bg-black">
+    <div className="flex flex-col flex-1 items-center bg-zinc-50 font-sans dark:bg-zinc-950">
       <DemoNav />
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-center gap-6 py-32 px-16 text-center">
-        <h1 className="text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-          Khmer Sign Language Prediction Demo (LSTM)
-        </h1>
-        <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-          This page uses backend_keras3&apos;s LSTM model (pose + hands,
-          20 classes) instead of the original 25-class hands-only model.
-        </p>
+      <main className="flex flex-1 w-full max-w-4xl flex-col items-center justify-center gap-10 px-6 py-20 text-center sm:px-10 sm:py-28">
+        <div className="flex flex-col items-center gap-3">
+          <span className="rounded-full border border-black/[.06] bg-black/[.02] px-3 py-1 text-xs font-medium tracking-wide text-zinc-500 dark:border-white/[.08] dark:bg-white/[.04] dark:text-zinc-400">
+            Live Model Demo
+          </span>
+          <h1 className="text-3xl font-semibold tracking-tight text-black sm:text-4xl dark:text-zinc-50">
+            Khmer Sign Language Prediction Demo (LSTM)
+          </h1>
+          <p className="max-w-md text-base leading-relaxed text-zinc-600 sm:text-lg dark:text-zinc-400">
+            This page uses backend_keras3&apos;s LSTM model (pose + hands,
+            20 classes) instead of the original 25-class hands-only model.
+          </p>
+        </div>
         <CameraPreview
           videoRef={camera.videoRef}
           status={camera.status}
