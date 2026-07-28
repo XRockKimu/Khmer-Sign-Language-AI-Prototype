@@ -36,7 +36,7 @@ function StatusBadge({
 }) {
   return (
     <span
-      className={`inline-flex items-center gap-2 rounded-full border px-3.5 py-1.5 text-[11px] font-semibold tracking-wide uppercase shadow-sm ${TONE_CLASSES[tone]}`}
+      className={`inline-flex w-fit items-center gap-2 rounded-full border px-3.5 py-1.5 text-[11px] font-semibold tracking-wide uppercase shadow-sm ${TONE_CLASSES[tone]}`}
     >
       <span
         className={`h-1.5 w-1.5 rounded-full ${DOT_CLASSES[tone]} ${pulse ? "animate-pulse" : ""}`}
@@ -46,34 +46,46 @@ function StatusBadge({
   );
 }
 
+/**
+ * Card chrome matches CameraPreview's container so the sidebar and the
+ * camera column read as one visual system.
+ */
+function StatusCard({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="flex w-full flex-col gap-3 rounded-2xl border border-black/[.06] bg-white/70 p-5 shadow-sm backdrop-blur-md dark:border-white/[.08] dark:bg-zinc-900/50">
+      {children}
+    </div>
+  );
+}
+
 export function PredictionStatus({ state }: { state: PredictionFlowState }) {
   switch (state.status) {
     case "idle":
       return (
-        <div className="flex flex-col items-center gap-3">
+        <StatusCard>
           <StatusBadge tone="neutral">Waiting for a hand</StatusBadge>
           <p className="text-sm text-zinc-500 dark:text-zinc-400">
             Show a hand sign to the camera to begin.
           </p>
-        </div>
+        </StatusCard>
       );
 
     case "hand_detected":
       return (
-        <div className="flex flex-col items-center gap-3">
+        <StatusCard>
           <StatusBadge tone="info" pulse>
             Watching for a hand
           </StatusBadge>
           <p className="text-sm text-zinc-500 dark:text-zinc-400">
             Show your sign to the camera &mdash; capture starts automatically.
           </p>
-        </div>
+        </StatusCard>
       );
 
     case "capturing": {
       const percent = Math.round((state.framesCaptured / state.totalFrames) * 100);
       return (
-        <div className="flex w-full max-w-xs flex-col items-center gap-3">
+        <StatusCard>
           <StatusBadge tone="active" pulse>
             Capturing frames
           </StatusBadge>
@@ -86,34 +98,34 @@ export function PredictionStatus({ state }: { state: PredictionFlowState }) {
           <p className="text-xs text-zinc-500 dark:text-zinc-400">
             {state.framesCaptured} / {state.totalFrames} frames
           </p>
-        </div>
+        </StatusCard>
       );
     }
 
     case "predicting":
       return (
-        <div className="flex flex-col items-center gap-3">
+        <StatusCard>
           <StatusBadge tone="active" pulse>
             Predicting&hellip;
           </StatusBadge>
           <p className="text-sm text-zinc-500 dark:text-zinc-400">
             Running the sign through the model.
           </p>
-        </div>
+        </StatusCard>
       );
 
     case "result":
       return (
-        <div className="flex flex-col items-center gap-4">
+        <StatusCard>
           <StatusBadge tone="success">Result ready</StatusBadge>
-          <p className="text-4xl font-semibold tracking-tight text-black dark:text-zinc-50">
+          <p className="text-3xl font-semibold tracking-tight text-black dark:text-zinc-50">
             {state.label}
           </p>
           <p className="text-xs text-zinc-500 dark:text-zinc-400">
             Confidence: {Math.round(state.confidence * 100)}%
           </p>
           {state.topK.length > 0 && (
-            <ol className="flex w-full max-w-xs flex-col gap-1.5 text-left text-xs text-zinc-600 dark:text-zinc-400">
+            <ol className="flex w-full flex-col gap-1.5 text-left text-xs text-zinc-600 dark:text-zinc-400">
               {state.topK.map((entry, index) => (
                 <li
                   key={`${entry.label}-${index}`}
@@ -133,34 +145,34 @@ export function PredictionStatus({ state }: { state: PredictionFlowState }) {
               ))}
             </ol>
           )}
-        </div>
+        </StatusCard>
       );
 
     case "uncertain":
       return (
-        <div className="flex flex-col items-center gap-3">
+        <StatusCard>
           <StatusBadge tone="warning">Not confident enough</StatusBadge>
-          <p className="max-w-xs text-sm text-zinc-500 dark:text-zinc-400">
+          <p className="text-sm text-zinc-500 dark:text-zinc-400">
             The model couldn&apos;t recognize that sign clearly. Please try
             again.
           </p>
           <p className="text-xs text-zinc-400 dark:text-zinc-500">
             Best guess: {state.label} ({Math.round(state.confidence * 100)}%)
           </p>
-        </div>
+        </StatusCard>
       );
 
     case "error":
       return (
-        <div className="flex flex-col items-center gap-3">
+        <StatusCard>
           <StatusBadge tone="error">Something went wrong</StatusBadge>
-          <p className="max-w-xs text-sm text-zinc-500 dark:text-zinc-400">
+          <p className="text-sm text-zinc-500 dark:text-zinc-400">
             {state.message}
           </p>
           <p className="text-xs text-zinc-400 dark:text-zinc-500">
             Press Reset to try again.
           </p>
-        </div>
+        </StatusCard>
       );
   }
 }

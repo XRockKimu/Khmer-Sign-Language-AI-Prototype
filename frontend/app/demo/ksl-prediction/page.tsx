@@ -42,34 +42,42 @@ export default function KslPredictionDemo() {
   });
 
   return (
-    <div className="flex flex-col flex-1 items-center bg-zinc-50 font-sans dark:bg-zinc-950">
+    <div className="flex min-h-screen flex-col bg-zinc-50 font-sans dark:bg-zinc-950">
       <DemoNav />
-      <main className="flex flex-1 w-full max-w-4xl flex-col items-center justify-center gap-10 px-6 py-20 text-center sm:px-10 sm:py-28">
-        <div className="flex flex-col items-center gap-3">
-          <span className="rounded-full border border-black/[.06] bg-black/[.02] px-3 py-1 text-xs font-medium tracking-wide text-zinc-500 dark:border-white/[.08] dark:bg-white/[.04] dark:text-zinc-400">
+      <main className="mx-auto flex w-full max-w-6xl flex-1 flex-col gap-8 px-6 py-10 sm:px-10 sm:py-14">
+        <div className="flex flex-col gap-2">
+          <span className="w-fit rounded-full border border-black/[.06] bg-black/[.02] px-3 py-1 text-xs font-medium tracking-wide text-zinc-500 dark:border-white/[.08] dark:bg-white/[.04] dark:text-zinc-400">
             Live Model Demo
           </span>
-          <h1 className="text-3xl font-semibold tracking-tight text-black sm:text-4xl dark:text-zinc-50">
+          <h1 className="text-2xl font-semibold tracking-tight text-black sm:text-3xl dark:text-zinc-50">
             Khmer Sign Language Prediction Demo
           </h1>
-          <p className="max-w-md text-base leading-relaxed text-zinc-600 sm:text-lg dark:text-zinc-400">
-            This page will let you sign a gesture in front of your camera and
-            see the predicted Khmer label in real time.
+          <p className="max-w-xl text-sm leading-relaxed text-zinc-600 sm:text-base dark:text-zinc-400">
+            Sign a gesture in front of your camera and see the predicted
+            Khmer label in real time.
           </p>
         </div>
-        <CameraPreview
-          videoRef={camera.videoRef}
-          status={camera.status}
-          errorMessage={camera.errorMessage}
-          requestCamera={camera.requestCamera}
-        />
-        <PredictionStatus state={state} />
-        <DevFlowControls
-          state={state}
-          isCameraReady={isCameraReady}
-          reportHandDetected={reportHandDetected}
-          reset={reset}
-        />
+
+        <div className="flex flex-1 flex-col gap-6 lg:flex-row lg:items-start">
+          <div className="w-full lg:w-[72%]">
+            <CameraPreview
+              videoRef={camera.videoRef}
+              status={camera.status}
+              errorMessage={camera.errorMessage}
+              requestCamera={camera.requestCamera}
+            />
+          </div>
+
+          <aside className="flex w-full flex-col gap-4 lg:w-[28%]">
+            <PredictionStatus state={state} />
+            <DevFlowControls
+              state={state}
+              isCameraReady={isCameraReady}
+              reportHandDetected={reportHandDetected}
+              reset={reset}
+            />
+          </aside>
+        </div>
       </main>
     </div>
   );

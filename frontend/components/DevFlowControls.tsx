@@ -27,9 +27,9 @@ export function DevFlowControls({
   return (
     <details
       open
-      className="group w-full max-w-xs rounded-xl border border-black/[.06] bg-black/[.02] text-xs dark:border-white/[.08] dark:bg-white/[.03]"
+      className="group w-full rounded-2xl border border-black/[.06] bg-white/70 text-xs shadow-sm backdrop-blur-md dark:border-white/[.08] dark:bg-zinc-900/50"
     >
-      <summary className="flex cursor-pointer list-none items-center justify-between gap-2 px-4 py-3 font-medium text-zinc-500 transition-colors hover:text-zinc-700 [&::-webkit-details-marker]:hidden dark:text-zinc-400 dark:hover:text-zinc-200">
+      <summary className="flex cursor-pointer list-none items-center justify-between gap-2 px-5 py-3 font-medium text-zinc-500 transition-colors hover:text-zinc-700 [&::-webkit-details-marker]:hidden dark:text-zinc-400 dark:hover:text-zinc-200">
         <span className="flex items-center gap-2">
           <span className="h-1.5 w-1.5 rounded-full bg-zinc-400 dark:bg-zinc-600" />
           Developer controls
@@ -38,12 +38,12 @@ export function DevFlowControls({
           ▾
         </span>
       </summary>
-      <div className="flex flex-wrap justify-center gap-2 px-4 pb-4">
+      <div className="flex flex-wrap gap-2 px-5 pb-4">
         <button
           type="button"
           onClick={reportHandDetected}
           disabled={state.status !== "idle" || !isCameraReady}
-          className="rounded-full bg-black px-3.5 py-1.5 font-medium text-white transition-colors hover:bg-zinc-800 disabled:opacity-30 dark:bg-white dark:text-black dark:hover:bg-zinc-200"
+          className="flex-1 rounded-full bg-black px-3.5 py-1.5 font-medium text-white transition-colors hover:bg-zinc-800 disabled:opacity-30 dark:bg-white dark:text-black dark:hover:bg-zinc-200"
         >
           Start capture
         </button>
@@ -51,7 +51,7 @@ export function DevFlowControls({
           type="button"
           onClick={reset}
           disabled={state.status === "idle"}
-          className="rounded-full border border-black/10 px-3.5 py-1.5 font-medium text-zinc-700 transition-colors hover:bg-black/5 disabled:opacity-30 dark:border-white/20 dark:text-zinc-300 dark:hover:bg-white/10"
+          className="flex-1 rounded-full border border-black/10 px-3.5 py-1.5 font-medium text-zinc-700 transition-colors hover:bg-black/5 disabled:opacity-30 dark:border-white/20 dark:text-zinc-300 dark:hover:bg-white/10"
         >
           Reset
         </button>
