@@ -10,19 +10,47 @@ import { TOTAL_CAPTURE_FRAMES, type PredictionFlowState } from "@/hooks/usePredi
 
 const HAVE_CURRENT_DATA = 2;
 
-function captureFrameBlob(video: HTMLVideoElement): Promise<Blob | null> {
-  const canvas = document.createElement("canvas");
-  canvas.width = video.videoWidth;
-  canvas.height = video.videoHeight;
+// Caps the long edge of the uploaded frame. MediaPipe's landmark output is
+// normalized (0-1) regardless of input resolution, so this has no effect on
+// the feature format the model expects -- it only shrinks how many pixels
+// the backend's per-frame MediaPipe pass (the dominant cost in each
+// /keypoints/extract round trip) has to run over.
+const MAX_CAPTURE_DIMENSION = 480;
 
-  if (canvas.width === 0 || canvas.height === 0) {
+// Reused across every frame of every capture session instead of creating a
+// new <canvas> element per frame. Capture is strictly sequential (the loop
+// always awaits one frame's full round trip before grabbing the next, per
+// this file's docstring below), so there is never more than one in-flight
+// draw/encode at a time -- reusing one canvas is safe and just avoids
+// per-frame element creation and backing-buffer reallocation churn.
+let sharedCanvas: HTMLCanvasElement | null = null;
+
+function getFrameCanvas(width: number, height: number): HTMLCanvasElement {
+  if (!sharedCanvas) {
+    sharedCanvas = document.createElement("canvas");
+  }
+  if (sharedCanvas.width !== width) sharedCanvas.width = width;
+  if (sharedCanvas.height !== height) sharedCanvas.height = height;
+  return sharedCanvas;
+}
+
+function captureFrameBlob(video: HTMLVideoElement): Promise<Blob | null> {
+  const videoWidth = video.videoWidth;
+  const videoHeight = video.videoHeight;
+
+  if (videoWidth === 0 || videoHeight === 0) {
     return Promise.resolve(null);
   }
 
+  const scale = Math.min(1, MAX_CAPTURE_DIMENSION / Math.max(videoWidth, videoHeight));
+  const width = Math.round(videoWidth * scale);
+  const height = Math.round(videoHeight * scale);
+
+  const canvas = getFrameCanvas(width, height);
   const ctx = canvas.getContext("2d");
   if (!ctx) return Promise.resolve(null);
 
-  ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+  ctx.drawImage(video, 0, 0, width, height);
   return new Promise((resolve) => canvas.toBlob(resolve, "image/jpeg", 0.8));
 }
 
